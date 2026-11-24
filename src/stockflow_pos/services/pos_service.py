@@ -301,6 +301,13 @@ def get_dashboard_summary(db: Session, user: User) -> DashboardSummary:
     )
 
 
+def _sanitize_csv_cell(value: str) -> str:
+    """Prevent spreadsheet formula injection when exporting user text to CSV."""
+    if value and value[0] in ("=", "+", "-", "@", "\t", "\r"):
+        return f"'{value}"
+    return value
+
+
 def export_sales_csv(db: Session) -> str:
     """Generate a UTF-8 CSV report of all sales ready to open in Excel."""
     sales = list_sales(db, limit=1000)
@@ -315,7 +322,7 @@ def export_sales_csv(db: Session) -> str:
             [
                 sale.receipt_number,
                 sale.created_at.strftime("%Y-%m-%d %H:%M:%S"),
-                sale.customer_name,
+                _sanitize_csv_cell(sale.customer_name),
                 sale.payment_method,
                 f"{Decimal(sale.subtotal):.2f}",
                 f"{Decimal(sale.igv):.2f}",

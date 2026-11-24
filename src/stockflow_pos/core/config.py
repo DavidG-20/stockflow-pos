@@ -1,19 +1,25 @@
 """Application settings loaded from environment variables."""
 
 from decimal import Decimal
+import secrets
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Typed configuration with safe local defaults."""
+    """Typed configuration with ephemeral dev secret and production guardrails."""
 
     app_name: str = "StockFlow POS"
+    app_env: str = "development"
+    seed_demo_data: bool = True
     database_url: str = "sqlite:///./stockflow.db"
-    secret_key: str = "dev-secret-key-change-in-production-32chars"
+    secret_key: str = Field(default_factory=lambda: secrets.token_urlsafe(32))
     access_token_expire_minutes: int = 480
     igv_rate: Decimal = Decimal("0.18")
     expiry_alert_days: int = 30
+    login_rate_limit_max: int = 10
+    login_rate_limit_window_seconds: int = 60
 
     model_config = SettingsConfigDict(
         env_file=".env",

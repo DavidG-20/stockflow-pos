@@ -4,7 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -20,10 +20,11 @@ STATIC_DIR = Path(__file__).parent / "static"
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    """Initialize database tables and idempotent demo seed data on startup."""
+    """Initialize database tables and optional demo seed data on startup."""
     Base.metadata.create_all(bind=engine)
-    with SessionLocal() as db:
-        seed_initial_data(db)
+    if settings.seed_demo_data and settings.app_env != "production":
+        with SessionLocal() as db:
+            seed_initial_data(db)
     yield
 
 
@@ -33,6 +34,16 @@ app = FastAPI(
     description="Sistema Full-Stack de Inventario y Punto de Venta (POS) con JWT, control de caja y reportes.",
     lifespan=lifespan,
 )
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next) -> Response:
+    """Attach baseline HTTP security headers to every response."""
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
 
 
 @app.get("/health", tags=["health"])

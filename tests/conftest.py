@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from stockflow_pos.core.database import Base, get_db
+from stockflow_pos.core.security import login_rate_limiter
 from stockflow_pos.core.seed import seed_initial_data
 from stockflow_pos.main import app
 
@@ -35,20 +36,11 @@ def client() -> Generator[TestClient, None, None]:
             db.close()
 
     app.dependency_overrides[get_db] = override_get_db
+    login_rate_limiter.reset()
 
     with TestClient(app) as test_client:
         yield test_client
 
     app.dependency_overrides.clear()
+    login_rate_limiter.reset()
     Base.metadata.drop_all(bind=engine)
-
-
-def auth_headers(client: TestClient, username: str, password: str) -> dict[str, str]:
-    """Log in and return Authorization Bearer headers."""
-    resp = client.post(
-        "/api/v1/auth/login",
-        json={"username": username, "password": password},
-    )
-    assert resp.status_code == 200
-    token = resp.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}

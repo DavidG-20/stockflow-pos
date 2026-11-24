@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from stockflow_pos.core.database import get_db
 from stockflow_pos.core.security import (
     create_access_token,
+    enforce_login_rate_limit,
     get_current_user,
     require_admin,
     verify_password,
@@ -49,7 +50,12 @@ from stockflow_pos.services.pos_service import (
 router = APIRouter(prefix="/api/v1")
 
 
-@router.post("/auth/login", response_model=TokenResponse, tags=["auth"])
+@router.post(
+    "/auth/login",
+    response_model=TokenResponse,
+    dependencies=[Depends(enforce_login_rate_limit)],
+    tags=["auth"],
+)
 def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
     """Autentica al usuario y devuelve un token JWT Bearer."""
     user = db.execute(

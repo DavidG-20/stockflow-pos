@@ -1,12 +1,15 @@
 """Password hashing (PBKDF2-HMAC-SHA256) and JWT authentication helpers."""
 
+from collections import defaultdict, deque
 from datetime import datetime, timedelta, timezone
 import hashlib
 import hmac
+import math
 import secrets
+import time
 from typing import Any
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import jwt
 from sqlalchemy import select
@@ -19,6 +22,48 @@ from stockflow_pos.models.entities import User
 ALGORITHM = "HS256"
 PBKDF2_ITERATIONS = 120_000
 bearer_scheme = HTTPBearer(auto_error=False)
+
+
+class LoginRateLimiter:
+    """Sliding-window rate limiter to protect /auth/login against brute-force attacks."""
+
+    def __init__(self, max_attempts: int, window_seconds: int) -> None:
+        self.max_attempts = max_attempts
+        self.window_seconds = window_seconds
+        self._attempts: dict[str, deque[float]] = defaultdict(deque)
+
+    def check(self, client_ip: str) -> tuple[bool, int]:
+        now = time.monotonic()
+        cutoff = now - self.window_seconds
+        bucket = self._attempts[client_ip]
+        while bucket and bucket[0] <= cutoff:
+            bucket.popleft()
+        if len(bucket) >= self.max_attempts:
+            retry_after = max(1, math.ceil(self.window_seconds - (now - bucket[0])))
+            return False, retry_after
+        bucket.append(now)
+        return True, 0
+
+    def reset(self) -> None:
+        self._attempts.clear()
+
+
+login_rate_limiter = LoginRateLimiter(
+    max_attempts=settings.login_rate_limit_max,
+    window_seconds=settings.login_rate_limit_window_seconds,
+)
+
+
+def enforce_login_rate_limit(request: Request) -> None:
+    """FastAPI dependency blocking excessive login attempts per client IP."""
+    client_ip = request.client.host if request.client else "unknown"
+    allowed, retry_after = login_rate_limiter.check(client_ip)
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Demasiados intentos de inicio de sesión. Espera {retry_after}s.",
+            headers={"Retry-After": str(retry_after)},
+        )
 
 
 def hash_password(password: str) -> str:

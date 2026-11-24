@@ -7,6 +7,15 @@ const state = {
 
 const $ = (sel) => document.querySelector(sel);
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 function formatMoney(val) {
   return `S/ ${Number(val).toFixed(2)}`;
 }
@@ -102,10 +111,10 @@ function renderCatalog(products) {
     const tile = document.createElement("div");
     tile.className = "product-tile";
     tile.innerHTML = `
-      <strong>${p.name}</strong>
-      <span class="meta">${p.sku} · ${p.category}</span>
+      <strong>${escapeHtml(p.name)}</strong>
+      <span class="meta">${escapeHtml(p.sku)} · ${escapeHtml(p.category)}</span>
       <span class="price">${formatMoney(p.unit_price)}</span>
-      <span class="meta">Stock: <strong>${p.stock}</strong></span>
+      <span class="meta">Stock: <strong>${Number(p.stock)}</strong></span>
       <button class="btn btn-primary" ${p.stock <= 0 ? "disabled" : ""}>+ Agregar</button>
     `;
     tile.querySelector("button").addEventListener("click", () => addToCart(p));
@@ -139,8 +148,8 @@ function renderCart() {
       row.className = "cart-row";
       row.innerHTML = `
         <div>
-          <strong>${product.name}</strong>
-          <div class="muted">${formatMoney(product.unit_price)} × ${quantity}</div>
+          <strong>${escapeHtml(product.name)}</strong>
+          <div class="muted">${formatMoney(product.unit_price)} × ${Number(quantity)}</div>
         </div>
         <div class="cart-controls">
           <span>${formatMoney(lineTotal)}</span>
@@ -179,12 +188,12 @@ function renderInventoryTable(products) {
 
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${p.sku}</td>
-      <td><strong>${p.name}</strong></td>
-      <td>${p.category}</td>
+      <td>${escapeHtml(p.sku)}</td>
+      <td><strong>${escapeHtml(p.name)}</strong></td>
+      <td>${escapeHtml(p.category)}</td>
       <td>${formatMoney(p.unit_price)}</td>
-      <td>${p.stock} <span class="muted">(mín. ${p.min_stock})</span></td>
-      <td>${p.expires_at || "—"}</td>
+      <td>${Number(p.stock)} <span class="muted">(mín. ${Number(p.min_stock)})</span></td>
+      <td>${escapeHtml(p.expires_at || "—")}</td>
       <td>${badges.join(" ")}</td>
       ${isAdmin ? `<td><button class="btn btn-ghost btn-restock">+10 u.</button></td>` : ""}
     `;
@@ -223,9 +232,9 @@ async function refreshSales() {
   sales.forEach((s) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td><strong>${s.receipt_number}</strong></td>
-      <td>${s.customer_name}</td>
-      <td>${s.payment_method}</td>
+      <td><strong>${escapeHtml(s.receipt_number)}</strong></td>
+      <td>${escapeHtml(s.customer_name)}</td>
+      <td>${escapeHtml(s.payment_method)}</td>
       <td>${formatMoney(s.subtotal)}</td>
       <td>${formatMoney(s.igv)}</td>
       <td><strong>${formatMoney(s.total)}</strong></td>
@@ -238,12 +247,12 @@ function showReceipt(sale) {
   const itemsHtml = sale.items
     .map(
       (i) =>
-        `<div style="display:flex;justify-content:space-between;font-size:0.9rem;"><span>${i.quantity}x ${i.product_name}</span><span>${formatMoney(i.line_total)}</span></div>`
+        `<div style="display:flex;justify-content:space-between;font-size:0.9rem;"><span>${Number(i.quantity)}x ${escapeHtml(i.product_name)}</span><span>${formatMoney(i.line_total)}</span></div>`
     )
     .join("");
   $("#receipt-content").innerHTML = `
     <h3 style="margin:0 0 0.25rem;">StockFlow POS — Boleta Simulada</h3>
-    <p style="margin:0 0 0.75rem;font-size:0.85rem;color:#475569;">Comprobante: <strong>${sale.receipt_number}</strong><br/>Cliente: ${sale.customer_name}<br/>Pago: ${sale.payment_method}</p>
+    <p style="margin:0 0 0.75rem;font-size:0.85rem;color:#475569;">Comprobante: <strong>${escapeHtml(sale.receipt_number)}</strong><br/>Cliente: ${escapeHtml(sale.customer_name)}<br/>Pago: ${escapeHtml(sale.payment_method)}</p>
     <hr/>
     ${itemsHtml}
     <hr/>

@@ -190,3 +190,46 @@ def test_cash_session_lifecycle_and_csv_report(client: TestClient) -> None:
     assert csv_resp.status_code == 200
     assert "text/csv" in csv_resp.headers["content-type"]
     assert "B001-000001" in csv_resp.text
+
+
+def test_security_headers_csv_injection_and_login_rate_limit(client: TestClient) -> None:
+    health = client.get("/health")
+    assert health.headers["x-content-type-options"] == "nosniff"
+    assert health.headers["x-frame-options"] == "DENY"
+
+    admin_headers = auth_headers(client, "admin", "admin123")
+    products = client.get("/api/v1/products", headers=admin_headers).json()
+    sale_resp = client.post(
+        "/api/v1/sales",
+        headers=admin_headers,
+        json={
+            "customer_name": "=CMD|' /C calc'!A0",
+            "payment_method": "cash",
+            "items": [{"product_id": products[0]["id"], "quantity": 1}],
+        },
+    )
+    assert sale_resp.status_code == 201
+    csv_resp = client.get("/api/v1/reports/sales.csv", headers=admin_headers)
+    assert "'=CMD|' /C calc'!A0" in csv_resp.text
+
+    from stockflow_pos.core.security import login_rate_limiter
+
+    original_max = login_rate_limiter.max_attempts
+    login_rate_limiter.reset()
+    login_rate_limiter.max_attempts = 2
+    try:
+        for _ in range(2):
+            resp = client.post(
+                "/api/v1/auth/login",
+                json={"username": "admin", "password": "wrongpass"},
+            )
+            assert resp.status_code == 401
+        blocked = client.post(
+            "/api/v1/auth/login",
+            json={"username": "admin", "password": "wrongpass"},
+        )
+        assert blocked.status_code == 429
+        assert "retry-after" in blocked.headers
+    finally:
+        login_rate_limiter.max_attempts = original_max
+        login_rate_limiter.reset()
