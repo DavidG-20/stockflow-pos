@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-stockflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-stockflow_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-stockflow}
+    volumes:
+      - stockflow_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-stockflow} -d ${POSTGRES_DB:-stockflow}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      APP_NAME: StockFlow POS
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-stockflow}:${POSTGRES_PASSWORD:-stockflow_dev_password}@db:5432/${POSTGRES_DB:-stockflow}
+      SECRET_KEY: ${SECRET_KEY:-cambia-esta-clave-secreta-en-produccion-32-chars}
+      IGV_RATE: ${IGV_RATE:-0.18}
+      EXPIRY_ALERT_DAYS: ${EXPIRY_ALERT_DAYS:-30}
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  stockflow_pg_data:
