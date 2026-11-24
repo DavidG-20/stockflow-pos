@@ -3,7 +3,7 @@
 from decimal import Decimal
 import secrets
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -20,6 +20,14 @@ class Settings(BaseSettings):
     expiry_alert_days: int = 30
     login_rate_limit_max: int = 10
     login_rate_limit_window_seconds: int = 60
+
+    @model_validator(mode="after")
+    def _validate_production_secret(self) -> "Settings":
+        if self.app_env.lower() == "production" and len(self.secret_key.strip()) < 32:
+            raise ValueError(
+                "En producción (APP_ENV=production) SECRET_KEY debe tener al menos 32 caracteres."
+            )
+        return self
 
     model_config = SettingsConfigDict(
         env_file=".env",

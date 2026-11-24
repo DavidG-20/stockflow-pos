@@ -38,6 +38,9 @@ class LoginRateLimiter:
         bucket = self._attempts[client_ip]
         while bucket and bucket[0] <= cutoff:
             bucket.popleft()
+        if not bucket:
+            self._attempts.pop(client_ip, None)
+            bucket = self._attempts[client_ip]
         if len(bucket) >= self.max_attempts:
             retry_after = max(1, math.ceil(self.window_seconds - (now - bucket[0])))
             return False, retry_after

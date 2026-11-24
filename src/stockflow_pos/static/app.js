@@ -199,12 +199,16 @@ function renderInventoryTable(products) {
     `;
     if (isAdmin) {
       tr.querySelector(".btn-restock").addEventListener("click", async () => {
-        await apiFetch(`/api/v1/products/${p.id}/restock`, {
-          method: "PATCH",
-          body: JSON.stringify({ quantity: 10 }),
-        });
-        showToast(`Se repusieron +10 unidades a ${p.name}.`);
-        await Promise.all([refreshProducts(), refreshDashboard()]);
+        try {
+          await apiFetch(`/api/v1/products/${p.id}/restock`, {
+            method: "PATCH",
+            body: JSON.stringify({ quantity: 10 }),
+          });
+          showToast(`Se repusieron +10 unidades a ${p.name}.`);
+          await Promise.all([refreshProducts(), refreshDashboard()]);
+        } catch (err) {
+          showToast(err.message);
+        }
       });
     }
     tbody.appendChild(tr);
