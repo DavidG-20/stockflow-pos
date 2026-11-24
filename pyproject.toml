@@ -1,0 +1,29 @@
+[project]
+name = "stockflow-pos"
+version = "0.1.0"
+description = "Sistema Full-Stack de Inventario y Punto de Venta (POS) con FastAPI, JWT, control de caja y reportes."
+readme = "README.md"
+authors = [
+    { name = "David Garcia Garcia", email = "davidgarcia20.academico@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.165.0",
+    "pydantic-settings>=2.16.3",
+    "pyjwt>=2.15.1",
+    "sqlalchemy>=2.1.9",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[project.scripts]
+stockflow-pos = "stockflow_pos:main"
+
+[build-system]
+requires = ["uv_build>=0.13.9,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.2.0",
+]
