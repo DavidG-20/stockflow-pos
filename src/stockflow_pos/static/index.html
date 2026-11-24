@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StockFlow POS — Inventario y Punto de Venta</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <!-- Vista de inicio de sesión -->
+  <main id="login-view" class="login-wrapper">
+    <section class="card login-card">
+      <div class="brand">
+        <span class="brand-badge">POS</span>
+        <div>
+          <h1>StockFlow POS</h1>
+          <p class="muted">Sistema de Inventario, Caja y Ventas</p>
+        </div>
+      </div>
+
+      <form id="login-form" class="stack">
+        <label>
+          <span>Usuario</span>
+          <input id="username" type="text" placeholder="admin o cajero" required autocomplete="username" />
+        </label>
+        <label>
+          <span>Contraseña</span>
+          <input id="password" type="password" placeholder="••••••••" required autocomplete="current-password" />
+        </label>
+        <button type="submit" class="btn btn-primary">Ingresar</button>
+        <p id="login-error" class="error-msg hidden"></p>
+      </form>
+
+      <div class="demo-box">
+        <p class="muted">Accesos de prueba:</p>
+        <div class="demo-actions">
+          <button type="button" class="btn btn-ghost" data-demo-user="admin" data-demo-pass="admin123">
+            Admin (admin / admin123)
+          </button>
+          <button type="button" class="btn btn-ghost" data-demo-user="cajero" data-demo-pass="cajero123">
+            Cajero (cajero / cajero123)
+          </button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Vista principal del sistema -->
+  <div id="app-view" class="app-shell hidden">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-badge">POS</span>
+        <div>
+          <strong>StockFlow POS</strong>
+          <span id="user-badge" class="pill"></span>
+        </div>
+      </div>
+      <nav class="tabs" role="tablist">
+        <button class="tab active" data-tab="pos">Punto de Venta</button>
+        <button class="tab" data-tab="inventory">Inventario y Alertas</button>
+        <button class="tab" data-tab="cash">Caja y Reportes</button>
+      </nav>
+      <div class="topbar-actions">
+        <a href="/docs" target="_blank" class="btn btn-ghost">API Docs</a>
+        <button id="logout-btn" class="btn btn-ghost">Salir</button>
+      </div>
+    </header>
+
+    <section class="kpi-grid" id="kpi-grid">
+      <article class="card kpi">
+        <span class="muted">Ventas de hoy</span>
+        <strong id="kpi-today-revenue">S/ 0.00</strong>
+        <small id="kpi-today-count" class="muted">0 comprobantes</small>
+      </article>
+      <article class="card kpi">
+        <span class="muted">Stock bajo</span>
+        <strong id="kpi-low-stock" class="text-warn">0</strong>
+        <small class="muted">productos en mínimo</small>
+      </article>
+      <article class="card kpi">
+        <span class="muted">Por vencer / vencidos</span>
+        <strong id="kpi-expiring" class="text-danger">0</strong>
+        <small class="muted">en los próximos 30 días</small>
+      </article>
+      <article class="card kpi">
+        <span class="muted">Estado de caja</span>
+        <strong id="kpi-cash-status">Cerrada</strong>
+        <small class="muted">turno actual</small>
+      </article>
+    </section>
+
+    <div id="toast" class="toast hidden"></div>
+
+    <!-- Pestaña 1: Punto de Venta -->
+    <section id="tab-pos" class="tab-panel pos-layout">
+      <div class="card">
+        <div class="section-header">
+          <h2>Catálogo de productos</h2>
+          <input id="pos-search" type="search" placeholder="Buscar por nombre o SKU..." />
+        </div>
+        <div id="pos-catalog" class="catalog-grid"></div>
+      </div>
+
+      <aside class="card cart-panel">
+        <h2>Carrito de venta</h2>
+        <div id="cart-items" class="cart-items"></div>
+
+        <div class="cart-summary">
+          <div class="row"><span>Subtotal (sin IGV)</span><span id="cart-subtotal">S/ 0.00</span></div>
+          <div class="row"><span>IGV (18%)</span><span id="cart-igv">S/ 0.00</span></div>
+          <div class="row total-row"><span>Total</span><span id="cart-total">S/ 0.00</span></div>
+        </div>
+
+        <form id="checkout-form" class="stack">
+          <label>
+            <span>Cliente</span>
+            <input id="customer-name" type="text" value="Cliente Varios" required />
+          </label>
+          <label>
+            <span>Método de pago</span>
+            <select id="payment-method">
+              <option value="cash">Efectivo</option>
+              <option value="yape_plin">Yape / Plin</option>
+              <option value="card">Tarjeta</option>
+            </select>
+          </label>
+          <button type="submit" class="btn btn-primary" id="checkout-btn">Emitir comprobante</button>
+        </form>
+      </aside>
+    </section>
+
+    <!-- Pestaña 2: Inventario -->
+    <section id="tab-inventory" class="tab-panel hidden stack">
+      <div id="admin-product-card" class="card hidden">
+        <h2>Nuevo producto (solo Admin)</h2>
+        <form id="new-product-form" class="form-grid">
+          <input id="p-sku" placeholder="SKU (ej. BEB-010)" required />
+          <input id="p-name" placeholder="Nombre del producto" required />
+          <input id="p-category" placeholder="Categoría" value="Abarrotes" required />
+          <input id="p-price" type="number" step="0.01" min="0.10" placeholder="Precio (S/)" required />
+          <input id="p-stock" type="number" min="0" placeholder="Stock inicial" required />
+          <input id="p-min" type="number" min="0" value="5" placeholder="Stock mínimo" required />
+          <input id="p-expiry" type="date" title="Fecha de vencimiento (opcional)" />
+          <button type="submit" class="btn btn-primary">Guardar producto</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="section-header">
+          <h2>Inventario y alertas</h2>
+          <label class="checkbox-inline">
+            <input type="checkbox" id="filter-low-stock" />
+            <span>Solo stock bajo</span>
+          </label>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>SKU</th>
+                <th>Producto</th>
+                <th>Categoría</th>
+                <th>Precio</th>
+                <th>Stock</th>
+                <th>Vencimiento</th>
+                <th>Estado</th>
+                <th class="admin-only">Acción</th>
+              </tr>
+            </thead>
+            <tbody id="inventory-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pestaña 3: Caja y Reportes -->
+    <section id="tab-cash" class="tab-panel hidden stack">
+      <div class="two-col">
+        <div class="card stack">
+          <h2>Control de caja</h2>
+          <div id="cash-status-box" class="muted">Cargando estado de caja...</div>
+          <form id="open-cash-form" class="inline-form">
+            <input id="opening-amount" type="number" step="0.01" min="0" value="100.00" required />
+            <button type="submit" class="btn btn-primary">Abrir caja</button>
+          </form>
+          <form id="close-cash-form" class="inline-form hidden">
+            <input id="closing-amount" type="number" step="0.01" min="0" placeholder="Efectivo contado (S/)" required />
+            <button type="submit" class="btn btn-warn">Cerrar y cuadrar caja</button>
+          </form>
+          <div id="cash-close-summary" class="hidden"></div>
+        </div>
+
+        <div class="card stack">
+          <h2>Reportes</h2>
+          <p class="muted">Descarga el historial de ventas en CSV (abre directo en Excel con tildes correctas).</p>
+          <button id="download-csv-btn" class="btn btn-primary admin-only">Descargar reporte CSV</button>
+          <p id="csv-non-admin-note" class="muted hidden">La exportación de reportes requiere rol de Administrador.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Últimas ventas</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Comprobante</th>
+                <th>Cliente</th>
+                <th>Pago</th>
+                <th>Subtotal</th>
+                <th>IGV</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody id="sales-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Modal de comprobante -->
+  <dialog id="receipt-modal" class="receipt-modal">
+    <div id="receipt-content"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" onclick="window.print()">Imprimir</button>
+      <button type="button" class="btn btn-primary" id="close-receipt-btn">Cerrar</button>
+    </div>
+  </dialog>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
