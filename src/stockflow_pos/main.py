@@ -19,12 +19,13 @@ STATIC_DIR = Path(__file__).parent / "static"
 
 
 @asynccontextmanager
-async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+async def lifespan(app_instance: FastAPI) -> AsyncIterator[None]:
     """Initialize database tables and optional demo seed data on startup."""
-    Base.metadata.create_all(bind=engine)
-    if settings.seed_demo_data and settings.app_env != "production":
-        with SessionLocal() as db:
-            seed_initial_data(db)
+    if not getattr(app_instance.state, "testing", False):
+        Base.metadata.create_all(bind=engine)
+        if settings.seed_demo_data and settings.app_env != "production":
+            with SessionLocal() as db:
+                seed_initial_data(db)
     yield
 
 
